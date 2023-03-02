@@ -1,0 +1,15 @@
+{
+  "name": "spotifylikedsongsconverter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Nico Nussmüller",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "spotify-web-api-node": "^5.0.2"
+  }
+}
