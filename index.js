@@ -1,10 +1,12 @@
 const Client = require('spotify-web-api-node');
 const express = require('express');
+const app = express();
 
-const client_id = '<your_client_id>';
-const client_secret = '<your_client_secret>';
+const client_id = '31447e0990434b3cb640203f4416b621';
+const client_secret = 'eb2787e3f52944e9899ba2d430702a06';
 const redirect_uri = 'http://localhost:8888/callback';
 const scopes = ['user-library-read', 'playlist-modify-private'];
+server = undefined;
 
 const spotifyApi = new Client({
     clientId: client_id,
@@ -12,7 +14,6 @@ const spotifyApi = new Client({
     redirectUri: redirect_uri
 });
 
-const app = express();
 app.get('/callback', async (req, res) => {
     const error = req.query.error;
     const code = req.query.code;
@@ -37,6 +38,8 @@ app.get('/callback', async (req, res) => {
         spotifyApi.setAccessToken(access_token);
         spotifyApi.setRefreshToken(refresh_token);
 
+        res.send('Authorization successful! Please close this window and return to the console.');
+
         server.close();
     } catch (err) {
         console.error('Authorization failed:', err);
@@ -46,7 +49,7 @@ app.get('/callback', async (req, res) => {
 
 async function authorizeApp() {
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes);
-    const server = app.listen(8888, () => {
+    server = app.listen(8888, () => {
         console.log('Please authorize this app on the following page:');
         console.log(authorizeURL);
     });
@@ -59,32 +62,31 @@ async function createPlaylistFromLikedSongs(playlistName) {
             await authorizeApp();
         }
 
-        let playlist = null;
         const playlists = await spotifyApi.getUserPlaylists();
-        playlists.body.items.forEach(p => {
-            if (p.name === playlistName) {
-                playlist = p;
-            }
-        });
+        let playlist = playlists.body.items.find(p => p.name === playlistName);
 
         if (!playlist) {
-            const user = await spotifyApi.getMe();
-            playlist = await spotifyApi.createPlaylist(user.body.id, playlistName, {
+            console.log(`Playlist '${playlistName}' not found, creating it...`);
+            playlist = await spotifyApi.createPlaylist(playlistName, {
                 public: false
             });
         }
-        console.log(`Using playlist '${playlist.name}' (${playlist.id})`);
+
+        console.log(`Using playlist '${playlist.body.name}' (${playlist.body.id})`);
 
         const pageSize = 50;
         let offset = 0;
-        let allSongs = [];
+        let totalLikedSongsCount;
+        let allLikedSongs = [];
         do {
-            const { body } = await spotifyApi.getMySavedTracks({ limit: pageSize, offset });
-            allSongs = allSongs.concat(body.items);
-            offset += pageSize;
-        } while (allSongs.length < body.total);
+            let savedTracks = await spotifyApi.getMySavedTracks({ limit: pageSize, offset: offset });
+            totalLikedSongsCount = savedTracks.body.total;
 
-        console.log(`Retrieved ${allSongs.length} liked songs`);
+            allLikedSongs = allLikedSongs.concat(savedTracks.items);
+            offset += pageSize;
+        } while (allLikedSongs.length < totalLikedSongsCount);
+
+        console.log(`Retrieved ${allLikedSongs.length} liked songs`);
 
         const allLikedSongIds = allLikedSongs.map(song => song.track.id);
         const playlistSongIds = allPlaylistSongs.map(song => song.track.id);
@@ -92,7 +94,7 @@ async function createPlaylistFromLikedSongs(playlistName) {
 
         if (songsToRemove.length > 0) {
             console.log(`Removing ${songsToRemove.length} songs from playlist`);
-            await spotifyApi.removeTracksFromPlaylist(playlistId, songsToRemove.map(songId => playlistSongIds.first(x => x.track.id === songId)));
+            await spotifyApi.removeTracksFromPlaylist(playlistId, songsToRemove.map(songId => playlistSongIds.find(x => x.track.id === songId)));
         } else {
             console.log('No songs to remove');
         }
