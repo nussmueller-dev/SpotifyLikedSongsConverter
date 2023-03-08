@@ -62,7 +62,10 @@ async function createPlaylistFromLikedSongs(playlistName) {
             await authorizeApp();
         }
 
-        const playlists = await spotifyApi.getUserPlaylists();
+        const user = await spotifyApi.getMe();
+        console.log('Retrieved user:', user);
+        const playlists = await spotifyApi.getUserPlaylists(user.body.id);
+        console.log(playlists);
         let playlist = playlists.body.items.find(p => p.name === playlistName);
 
         if (!playlist) {
@@ -76,50 +79,53 @@ async function createPlaylistFromLikedSongs(playlistName) {
 
         const pageSize = 50;
         let offset = 0;
-        let totalLikedSongsCount;
-        let allLikedSongs = [];
+        let totalSongsCount;
+        let allLikedSongIds = [];
         do {
             let savedTracks = await spotifyApi.getMySavedTracks({ limit: pageSize, offset: offset });
-            totalLikedSongsCount = savedTracks.body.total;
+            totalSongsCount = savedTracks.body.total;
 
-            allLikedSongs = allLikedSongs.concat(savedTracks.items);
+            let songIds = savedTracks.body.items.map(song => song.track.id);
+            allLikedSongIds = allLikedSongIds.concat(songIds);
             offset += pageSize;
-        } while (allLikedSongs.length < totalLikedSongsCount);
+        } while (allLikedSongIds.length < totalSongsCount);
 
-        console.log(`Retrieved ${allLikedSongs.length} liked songs`);
+        console.log(`Retrieved ${allLikedSongIds.length} liked songs`);
 
-        const allLikedSongIds = allLikedSongs.map(song => song.track.id);
-        const playlistSongIds = allPlaylistSongs.map(song => song.track.id);
-        const songsToRemove = playlistSongIds.filter(songId => !allLikedSongIds.includes(songId));
+        offset = 0;
+        let playlistSongIds = [];
+        do {
+            let savedTracks = await spotifyApi.getMySavedTracks({ limit: pageSize, offset: offset });
+            totalSongsCount = savedTracks.body.total;
 
-        if (songsToRemove.length > 0) {
-            console.log(`Removing ${songsToRemove.length} songs from playlist`);
-            await spotifyApi.removeTracksFromPlaylist(playlistId, songsToRemove.map(songId => playlistSongIds.find(x => x.track.id === songId)));
+            let songIds = savedTracks.body.items.map(song => song.track.id);
+            playlistSongIds = playlistSongIds.concat(songIds);
+            offset += pageSize;
+        } while (playlistSongIds.length < totalSongsCount);
+
+        console.log(`Retrieved ${playlistSongIds.length} playlist songs`);
+
+        const songIdsToRemove = playlistSongIds.filter(songId => !allLikedSongIds.includes(songId));
+        if (songIdsToRemove.length > 0) {
+            console.log(`Removing ${songIdsToRemove.length} songs from playlist`);
+            await spotifyApi.removeTracksFromPlaylist(playlistId, songIdsToRemove);
         } else {
             console.log('No songs to remove');
         }
 
-        const playlistTracks = await spotifyApi.getPlaylistTracks(playlist.id, { limit: 100 });
-        const existingTracks = new Set();
-        playlistTracks.body.items.forEach(item => {
-            const track = item.track;
-            if (track) {
-                existingTracks.add(track.id);
+        const tracksToAdd = allLikedSongIds.filter(songId => !playlistSongIds.includes(songId));
+        if (tracksToAdd.length !== 0) {
+            console.log(`Adding ${tracksToAdd.length} new songs to playlist`);
+
+            const chunkSize = 100;
+            for (let i = 0; i < tracksToAdd.length; i += chunkSize) {
+                const tracks = tracksToAdd.slice(i, i + chunkSize);
+                await spotifyApi.addTracksToPlaylist(playlist.id, tracks);
             }
-        });
-
-        const tracksToAdd = allSongs.filter(song => !existingTracks.has(song.track.id));
-        if (tracksToAdd.length === 0) {
+        } else {
             console.log('All liked songs are already in the playlist');
-            return;
         }
-        console.log(`Adding ${tracksToAdd.length} new songs to playlist`);
 
-        const chunkSize = 100;
-        for (let i = 0; i < tracksToAdd.length; i += chunkSize) {
-            const tracks = tracksToAdd.slice(i, i + chunkSize).map(song => song.track.uri);
-            await spotifyApi.addTracksToPlaylist(playlist.id, tracks);
-        }
 
         console.log('Playlist updated successfully!');
     } catch (err) {
