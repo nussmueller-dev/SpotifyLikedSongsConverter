@@ -1,18 +1,19 @@
 const Client = require('spotify-web-api-node');
 const express = require('express');
+const StorageHandler = require('./src/storageHandler.js');
+const Config = require('./storage/config.json');
 const app = express();
 
-const client_id = '31447e0990434b3cb640203f4416b621';
-const client_secret = 'eb2787e3f52944e9899ba2d430702a06';
-const redirect_uri = 'http://localhost:8888/callback';
 const scopes = ['user-library-read', 'playlist-modify-private', 'playlist-modify-public', 'playlist-read-private'];
 server = undefined;
 
 const spotifyApi = new Client({
-    clientId: client_id,
-    clientSecret: client_secret,
-    redirectUri: redirect_uri
+    clientId: Config.clientId,
+    clientSecret: Config.clientSecret,
+    redirectUri: Config.redirectUrl
 });
+
+StorageHandler.loadData();
 
 app.get('/callback', async (req, res) => {
     const error = req.query.error;
@@ -32,11 +33,14 @@ app.get('/callback', async (req, res) => {
         const access_token = data.body['access_token'];
         const refresh_token = data.body['refresh_token'];
         console.log('Authorization successful!');
-        console.log('Access token:', access_token);
-        console.log('Refresh token:', refresh_token);
+
+        StorageHandler.data.token = access_token;
+        StorageHandler.data.refreshToken = refresh_token;
+        StorageHandler.saveData();
 
         spotifyApi.setAccessToken(access_token);
         spotifyApi.setRefreshToken(refresh_token);
+        await spotifyApi.getMe();
 
         res.send('Authorization successful! Please close this window and return to the console.');
 
@@ -59,7 +63,13 @@ async function authorizeApp() {
 async function createPlaylistFromLikedSongs(playlistName) {
     try {
         if (!spotifyApi.getAccessToken()) {
-            await authorizeApp();
+            try {
+                spotifyApi.setAccessToken(StorageHandler.data.token);
+                spotifyApi.setRefreshToken(StorageHandler.data.refreshToken);
+                await spotifyApi.getMe();
+            } catch {
+                await authorizeApp();
+            }
         }
 
         const user = await spotifyApi.getMe();
@@ -138,4 +148,4 @@ async function createPlaylistFromLikedSongs(playlistName) {
     }
 }
 
-createPlaylistFromLikedSongs('My Liked Songs');
+createPlaylistFromLikedSongs(Config.playListName);
