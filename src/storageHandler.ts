@@ -1,4 +1,4 @@
-const dataFilePath = "storage/data.json";
+const dataFilePath = "./storage/data.json";
 const fs = require("fs");
 
 export class StorageHandler {

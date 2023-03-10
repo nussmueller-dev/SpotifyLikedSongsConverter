@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es2016",                                 
-    "lib": ["es6"],                                     
+    "target": "es2016",
+    "lib": ["es6"],
     "module": "commonjs",
-    "rootDir": "src",    
-    "outDir": "build",   
-    "resolveJsonModule": true, 
-    "allowJs": false, 
+    "rootDir": "src",
+    "outDir": "build",
+    "resolveJsonModule": true,
+    "allowJs": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
