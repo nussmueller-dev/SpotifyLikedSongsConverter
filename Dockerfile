@@ -2,7 +2,7 @@ FROM node:lts-alpine
 ENV TZ=Europe/Zurich
 
 RUN apk add tzdata
-RUN npm install rimraf typescript ts-node nodemon @types/node
+RUN npm install --save rimraf typescript ts-node nodemon @types/node
 
 WORKDIR /usr/src/app
 
