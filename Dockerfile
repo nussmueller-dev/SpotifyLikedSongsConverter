@@ -9,7 +9,7 @@ RUN npm install --save rimraf typescript ts-node nodemon @types/node
 
 COPY package*.json ./
 
-RUN npm run build
+RUN npx tsc
 
 COPY ./build .
 
