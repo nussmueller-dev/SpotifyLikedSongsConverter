@@ -14,6 +14,7 @@
   "dependencies": {
     "express": "^4.18.2",
     "fs": "^0.0.1-security",
+    "moment": "^2.29.4",
     "node-schedule": "^2.1.1",
     "spotify-web-api-node": "^5.0.2"
   },
