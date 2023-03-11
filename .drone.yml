@@ -1,0 +1,52 @@
+kind: pipeline
+type: docker
+name: main
+
+steps:
+  - name: pre-build
+    image: alpine
+    environment:
+      CONFIG:
+        from_secret: spotify-config
+    commands:
+      - mkdir -p build
+      - cd ./build
+      - echo $${CONFIG} > config.json
+
+  - name: build
+    image: plugins/docker
+    settings:
+      registry:
+        from_secret: docker-registry
+      username:
+        from_secret: docker-username
+      password:
+        from_secret: docker-password
+      repo:
+        from_secret: docker-repo
+      tags: latest
+      dry_run: false
+      purge: true
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+---
+kind: pipeline
+type: docker
+name: after
+
+steps:
+  - name: deploy-to-server
+    image: plugins/webhook
+    settings:
+      urls:
+        from_secret: webhook
+
+trigger:
+  event:
+    - promote
+  target:
+    - production
