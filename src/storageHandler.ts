@@ -1,4 +1,6 @@
-const dataFilePath = "./storage/data.json";
+const dataFolderPath = "./storage";
+const dataFileName = "data.json";
+const dataFilePath = dataFolderPath + "/" + dataFileName;
 const fs = require("fs");
 
 export class StorageHandler {
@@ -9,6 +11,10 @@ export class StorageHandler {
   }
 
   loadData() {
+    if (!fs.existsSync(dataFolderPath)) {
+      fs.mkdirSync(dataFolderPath);
+    }
+
     if (!fs.existsSync(dataFilePath)) {
       this.saveData();
     }

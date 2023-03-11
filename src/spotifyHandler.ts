@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from "express";
 import { Server } from "http";
 import Client from "spotify-web-api-node";
-import config from "./storage/config.json";
+import config from "./config/config.json";
 import { StorageHandler } from "./storageHandler";
 
 const scopes = [
@@ -26,99 +26,23 @@ export class SpotifyHandler {
     this.setupCallbackApi();
   }
 
-  async createPlaylistFromLikedSongs(playlistName: string) {
+  async syncLikedSongsToPlaylist(playlistName: string) {
     try {
-      if (!spotifyApi.getAccessToken()) {
-        try {
-          spotifyApi.setAccessToken(this.storageHandler.data.token);
-          spotifyApi.setRefreshToken(this.storageHandler.data.refreshToken);
-          await spotifyApi.getMe();
-        } catch {
-          await this.authorizeApp();
-        }
-      }
+      await this.checkAcces();
+      const playlist = await this.getPlaylist(playlistName);
+      const likedSongs = await this.getAllTracksFromPlaylist();
+      const playlistSongs = await this.getAllTracksFromPlaylist(playlist.id);
 
-      const user = await spotifyApi.getMe();
-      const playlists = await spotifyApi.getUserPlaylists(user.body.id);
-      let playlist = playlists.body.items.find((p) => p.name === playlistName);
-
-      if (!playlist) {
-        console.log(`Playlist '${playlistName}' not found, creating it...`);
-        let playlistResponse = await spotifyApi.createPlaylist(playlistName);
-        playlist = playlistResponse.body;
-      }
-
-      console.log(`Using playlist '${playlist.name}' (${playlist.id})`);
-
-      const pageSize = 50;
-      let offset = 0;
-      let totalSongsCount;
-      let allLikedSongs: any = [];
-      do {
-        let savedTracks = await spotifyApi.getMySavedTracks({
-          limit: pageSize,
-          offset: offset,
-        });
-        totalSongsCount = savedTracks.body.total;
-
-        let songs = savedTracks.body.items.map((song) => {
-          return { id: song.track.id, uri: song.track.uri };
-        });
-        allLikedSongs = allLikedSongs.concat(songs);
-        offset += pageSize;
-      } while (allLikedSongs.length < totalSongsCount);
-
-      console.log(`Retrieved ${allLikedSongs.length} liked songs`);
-
-      offset = 0;
-      let playlistSongs: any = [];
-      do {
-        let savedTracks = await spotifyApi.getPlaylistTracks(playlist.id, {
-          limit: pageSize,
-          offset: offset,
-        });
-        totalSongsCount = savedTracks.body.total;
-
-        let songs = savedTracks.body.items.map((song) => {
-          return { id: song.track?.id, uri: song.track?.uri };
-        });
-        playlistSongs = playlistSongs.concat(songs);
-        offset += pageSize;
-      } while (playlistSongs.length < totalSongsCount);
-
-      console.log(`Retrieved ${playlistSongs.length} playlist songs`);
-
-      const songsToRemove = playlistSongs.filter(
-        (song: any) => !allLikedSongs.some((x: any) => x.id === song.id)
+      await this.addLikedSongsToPlaylist(
+        playlist.id,
+        likedSongs,
+        playlistSongs
       );
-      if (songsToRemove.length > 0) {
-        console.log(`Removing ${songsToRemove.length} songs from playlist`);
-
-        const chunkSize = 100;
-        for (let i = 0; i < songsToRemove.length; i += chunkSize) {
-          const tracks = songsToRemove.slice(i, i + chunkSize);
-          await spotifyApi.removeTracksFromPlaylist(playlist.id, tracks);
-        }
-      } else {
-        console.log("No songs to remove");
-      }
-
-      const tracksToAdd = allLikedSongs.filter(
-        (song: any) => !playlistSongs.some((x: any) => x.id === song.id)
+      await this.removeUnlikedTracksFromPlaylist(
+        playlist.id,
+        likedSongs,
+        playlistSongs
       );
-      if (tracksToAdd.length !== 0) {
-        console.log(`Adding ${tracksToAdd.length} new songs to playlist`);
-
-        const chunkSize = 100;
-        for (let i = 0; i < tracksToAdd.length; i += chunkSize) {
-          const tracks = tracksToAdd
-            .slice(i, i + chunkSize)
-            .map((x: any) => x.uri);
-          await spotifyApi.addTracksToPlaylist(playlist.id, tracks);
-        }
-      } else {
-        console.log("All liked songs are already in the playlist");
-      }
 
       console.log("Playlist updated successfully!");
     } catch (err) {
@@ -126,7 +50,118 @@ export class SpotifyHandler {
     }
   }
 
-  async authorizeApp() {
+  private async checkAcces() {
+    if (!spotifyApi.getAccessToken()) {
+      try {
+        spotifyApi.setAccessToken(this.storageHandler.data.token);
+        spotifyApi.setRefreshToken(this.storageHandler.data.refreshToken);
+        await spotifyApi.getMe();
+      } catch {
+        await this.authorizeApp();
+      }
+    }
+  }
+
+  private async getPlaylist(playlistName: string) {
+    const user = await spotifyApi.getMe();
+    const playlists = await spotifyApi.getUserPlaylists(user.body.id);
+    let playlist = playlists.body.items.find((p) => p.name === playlistName);
+
+    if (!playlist) {
+      console.log(`Playlist '${playlistName}' not found, creating it...`);
+      let playlistResponse = await spotifyApi.createPlaylist(playlistName);
+      playlist = playlistResponse.body;
+    }
+
+    console.log(`Using playlist '${playlist.name}' (${playlist.id})`);
+
+    return playlist;
+  }
+
+  private async getAllTracksFromPlaylist(playlistId?: string) {
+    const pageSize = 50;
+    let offset = 0;
+    let totalSongsCount;
+    let allSongs: ShortTrackModel[] = [];
+
+    do {
+      let savedTracks = playlistId
+        ? await spotifyApi.getPlaylistTracks(playlistId, {
+            limit: pageSize,
+            offset: offset,
+          })
+        : await spotifyApi.getMySavedTracks({
+            limit: pageSize,
+            offset: offset,
+          });
+
+      totalSongsCount = savedTracks.body.total;
+
+      let songs = savedTracks.body.items.map(
+        (song: any) => new ShortTrackModel(song.track.id, song.track.uri)
+      );
+      allSongs = allSongs.concat(songs);
+
+      offset += pageSize;
+    } while (allSongs.length < totalSongsCount);
+
+    console.log(
+      `Retrieved ${allSongs.length} ${
+        playlistId ? "playlist songs" : "liked songs"
+      }`
+    );
+
+    return allSongs;
+  }
+
+  private async removeUnlikedTracksFromPlaylist(
+    playListId: string,
+    likedSongs: ShortTrackModel[],
+    playlistSongs: ShortTrackModel[]
+  ) {
+    const songsToRemove = playlistSongs.filter(
+      (song: ShortTrackModel) =>
+        !likedSongs.some((x: ShortTrackModel) => x.id === song.id)
+    );
+
+    if (songsToRemove.length > 0) {
+      console.log(`Removing ${songsToRemove.length} songs from playlist`);
+
+      const chunkSize = 100;
+      for (let i = 0; i < songsToRemove.length; i += chunkSize) {
+        const tracks = songsToRemove.slice(i, i + chunkSize);
+        await spotifyApi.removeTracksFromPlaylist(playListId, tracks);
+      }
+    } else {
+      console.log("No songs to remove");
+    }
+  }
+
+  private async addLikedSongsToPlaylist(
+    playListId: string,
+    likedSongs: ShortTrackModel[],
+    playlistSongs: ShortTrackModel[]
+  ) {
+    const tracksToAdd = likedSongs.filter(
+      (song: ShortTrackModel) =>
+        !playlistSongs.some((x: any) => x.id === song.id)
+    );
+    if (tracksToAdd.length !== 0) {
+      console.log(`Adding ${tracksToAdd.length} new songs to playlist`);
+
+      const chunkSize = 100;
+      for (let i = 0; i < tracksToAdd.length; i += chunkSize) {
+        const tracks = tracksToAdd
+          .slice(i, i + chunkSize)
+          .map((x: ShortTrackModel) => x.uri);
+        await spotifyApi.addTracksToPlaylist(playListId, tracks);
+      }
+    } else {
+      console.log("All liked songs are already in the playlist");
+    }
+  }
+
+  private async authorizeApp() {
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, "some-state");
 
     this.server = app.listen(8888, () => {
@@ -137,7 +172,7 @@ export class SpotifyHandler {
     await new Promise((resolve) => this.server!.on("close", resolve));
   }
 
-  setupCallbackApi() {
+  private setupCallbackApi() {
     app.get("/callback", async (req: Request, res: Response) => {
       const error = req.query.error;
       const code = req.query.code;
@@ -179,4 +214,8 @@ export class SpotifyHandler {
       }
     });
   }
+}
+
+export class ShortTrackModel {
+  constructor(public id: string, public uri: string) {}
 }
