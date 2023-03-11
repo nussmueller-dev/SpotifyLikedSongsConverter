@@ -5,12 +5,10 @@ RUN apk add tzdata
 
 WORKDIR /usr/src/app
 
-RUN npm install --save rimraf typescript ts-node nodemon @types/node
+COPY . .
 
-COPY package*.json ./
+RUN npm ci --only=production
+RUN npm install --save typescript rimraf
+RUN npm run build
 
-RUN npx tsc
-
-COPY ./build .
-
-CMD [ "node", "index.js" ]
+CMD [ "node", "./build/index.js" ]
