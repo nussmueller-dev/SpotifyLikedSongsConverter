@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start:dev": "npx nodemon",
     "start": "npm run build && node build/index.js",
-    "build": "rimraf ./build && tsc"
+    "build": "rimraf ./build && npx tsc"
   },
   "author": "Nico Nussmüller",
   "license": "ISC",
