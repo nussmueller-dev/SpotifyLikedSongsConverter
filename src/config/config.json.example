@@ -2,5 +2,5 @@
   "clientId": "YOUR-CLIENT-ID",
   "clientSecret": "YOUR-CLIENT-SECRET",
   "redirectUrl": "http://localhost:8888/callback",
-  "playListName": "My Liked Songs"
+  "playListName": "My liked songs"
 }
