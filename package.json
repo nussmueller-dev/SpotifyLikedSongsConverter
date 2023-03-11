@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start:dev": "npx nodemon",
     "start": "npm run build && node build/index.js",
-    "build": "rimraf ./build && npx tsc"
+    "build": "rimraf ./build && tsc"
   },
   "author": "Nico Nussmüller",
   "license": "ISC",
@@ -16,7 +16,6 @@
     "fs": "^0.0.1-security",
     "moment": "^2.29.4",
     "node-schedule": "^2.1.1",
-    "rimraf": "^4.4.0",
     "spotify-web-api-node": "^5.0.2"
   },
   "devDependencies": {
