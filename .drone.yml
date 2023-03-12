@@ -9,8 +9,7 @@ steps:
       CONFIG:
         from_secret: spotify-config
     commands:
-      - mkdir -p build
-      - cd ./src
+      - cd ./src/config
       - echo $${CONFIG} > config.json
 
   - name: build
