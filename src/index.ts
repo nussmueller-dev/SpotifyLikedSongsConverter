@@ -6,6 +6,7 @@ import { SpotifyHandler } from "./spotifyHandler";
 const spotifyHandler = new SpotifyHandler();
 
 async function main() {
+  console.log(`Start at ${moment().format("DD.MM.YYYY HH:mm:ss")}`);
   await spotifyHandler.syncLikedSongsToPlaylist(config.playListName);
 
   schedule.scheduleJob("*/15 * * * *", async function () {
