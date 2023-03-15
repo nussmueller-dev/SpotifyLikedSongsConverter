@@ -164,7 +164,7 @@ export class SpotifyHandler {
 
   private async authorizeApp() {
     if(spotifyApi.getAccessToken()){
-      let refreshTokenResponse = await spotifyApi.refreshAccessToken().catch(() => {
+      let refreshTokenResponse = await spotifyApi.refreshAccessToken().catch(async () => {
         console.log('Refresh-Token not working');
         await authorizeAppByUrl();
       });
