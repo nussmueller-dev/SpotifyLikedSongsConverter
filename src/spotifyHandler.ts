@@ -52,13 +52,14 @@ export class SpotifyHandler {
 
   private async checkAcces() {
     if (!spotifyApi.getAccessToken()) {
-      try {
-        spotifyApi.setAccessToken(this.storageHandler.data.token);
-        spotifyApi.setRefreshToken(this.storageHandler.data.refreshToken);
-        await spotifyApi.getMe();
-      } catch {
-        await this.authorizeApp();
-      }
+      spotifyApi.setAccessToken(this.storageHandler.data.token);
+      spotifyApi.setRefreshToken(this.storageHandler.data.refreshToken);
+    }
+
+    try {
+      await spotifyApi.getMe();
+    } catch {
+      await this.authorizeApp();
     }
   }
 
@@ -162,6 +163,26 @@ export class SpotifyHandler {
   }
 
   private async authorizeApp() {
+    if(spotifyApi.getAccessToken()){
+      let refreshTokenResponse = await spotifyApi.refreshAccessToken().catch(() => {
+        console.log('Refresh-Token not working');
+        await authorizeAppByUrl();
+      });
+
+      if(refreshTokenResponse){
+        console.log('Refreshed Acces-Token');
+        
+        let accesToken = refreshTokenResponse.body['access_token'];
+        spotifyApi.setAccessToken(accesToken);
+        this.storageHandler.data.token = accesToken;
+        this.storageHandler.saveData();
+      }
+    }else{
+      await authorizeAppByUrl();
+    }
+  }
+
+    private async authorizeAppByUrl() {
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, "some-state");
 
     this.server = app.listen(8888, () => {
