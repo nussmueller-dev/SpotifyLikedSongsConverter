@@ -19,6 +19,10 @@ This is a Node.js and TypeScript-based bot that converts your liked songs to a n
 1. Clone the repository: `git clone https://github.com/Borelio/SpotifyLikedSongsConverter.git`
 2. Install dependencies: `npm install`
 
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
 ## 🙏 Credits
 
 - [Spotify Web API Node](https://github.com/thelinmichael/spotify-web-api-node) library for interacting with the Spotify API.
