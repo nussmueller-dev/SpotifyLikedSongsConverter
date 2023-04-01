@@ -32,4 +32,5 @@ export class StorageHandler {
 export class StorageData {
   token: string = "";
   refreshToken: string = "";
+  playListId: string = "";
 }

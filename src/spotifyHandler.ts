@@ -66,12 +66,25 @@ export class SpotifyHandler {
   private async getPlaylist(playlistName: string) {
     const user = await spotifyApi.getMe();
     const playlists = await spotifyApi.getUserPlaylists(user.body.id);
-    let playlist = playlists.body.items.find((p) => p.name === playlistName);
+    let loadedPlaylistById = true;
+    let playlist = playlists.body.items.find(
+      (p) => p.id === this.storageHandler.data.playListId
+    );
+
+    if (!playlist) {
+      playlist = playlists.body.items.find((p) => p.name === playlistName);
+      loadedPlaylistById = false;
+    }
 
     if (!playlist) {
       console.log(`Playlist '${playlistName}' not found, creating it...`);
       let playlistResponse = await spotifyApi.createPlaylist(playlistName);
       playlist = playlistResponse.body;
+    }
+
+    if (!loadedPlaylistById) {
+      this.storageHandler.data.playListId = playlist.id;
+      this.storageHandler.saveData();
     }
 
     console.log(`Using playlist '${playlist.name}' (${playlist.id})`);
@@ -163,26 +176,28 @@ export class SpotifyHandler {
   }
 
   private async authorizeApp() {
-    if(spotifyApi.getAccessToken()){
-      let refreshTokenResponse = await spotifyApi.refreshAccessToken().catch(async () => {
-        console.log('Refresh-Token not working');
-        await this.authorizeAppByUrl();
-      });
+    if (spotifyApi.getAccessToken()) {
+      let refreshTokenResponse = await spotifyApi
+        .refreshAccessToken()
+        .catch(async () => {
+          console.log("Refresh-Token not working");
+          await this.authorizeAppByUrl();
+        });
 
-      if(refreshTokenResponse){
-        console.log('Refreshed Acces-Token');
-        
-        let accesToken = refreshTokenResponse.body['access_token'];
+      if (refreshTokenResponse) {
+        console.log("Refreshed Acces-Token");
+
+        let accesToken = refreshTokenResponse.body["access_token"];
         spotifyApi.setAccessToken(accesToken);
         this.storageHandler.data.token = accesToken;
         this.storageHandler.saveData();
       }
-    }else{
+    } else {
       await this.authorizeAppByUrl();
     }
   }
 
-    private async authorizeAppByUrl() {
+  private async authorizeAppByUrl() {
     const authorizeURL = spotifyApi.createAuthorizeURL(scopes, "some-state");
 
     this.server = app.listen(8888, () => {
